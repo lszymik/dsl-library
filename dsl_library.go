@@ -9,10 +9,10 @@ import (
 
 type (
 	Workflow struct {
-		Id          string
-		Description string
-		Trigger     []Trigger
-		Root        Statement
+		Id          string    `json:"id"`
+		Description string    `json:"description,omitempty"`
+		Trigger     []Trigger `json:"trigger,omitempty"`
+		Root        Statement `json:"root"`
 	}
 
 	Trigger struct {
@@ -21,17 +21,17 @@ type (
 	}
 
 	Statement struct {
-		Step     *Step
-		Sequence *Sequence
-		Parallel *Parallel
+		Step     *Step     `json:"step,omitempty"`
+		Sequence *Sequence `json:"sequence,omitempty"`
+		Parallel *Parallel `json:"parallel,omitempty"`
 	}
 
 	Sequence struct {
-		Elements []*Statement
+		Elements []*Statement `json:"elements,omitempty"`
 	}
 
 	Parallel struct {
-		Branches []*Statement
+		Branches []*Statement `json:"branches,omitempty"`
 	}
 
 	Step struct {
