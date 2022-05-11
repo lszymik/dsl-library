@@ -9,8 +9,10 @@ import (
 
 type (
 	Workflow struct {
-		Trigger []Trigger
-		Root    Statement
+		Id          string
+		Description string
+		Trigger     []Trigger
+		Root        Statement
 	}
 
 	Trigger struct {
