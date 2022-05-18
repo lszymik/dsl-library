@@ -52,7 +52,7 @@ type (
 	}
 
 	Executable interface {
-		Execute(ctx workflow.Context) error
+		Execute(ctx workflow.Context, p Payload) error
 	}
 )
 
@@ -65,7 +65,7 @@ func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p Payload) ([]byte,
 	ctx = workflow.WithActivityOptions(ctx, ao)
 	logger := workflow.GetLogger(ctx)
 
-	err := dslWorkflow.Root.Execute(ctx)
+	err := dslWorkflow.Root.Execute(ctx, p)
 	if err != nil {
 		logger.Error("DSL Workflow failed.", zap.Error(err))
 		return nil, err
@@ -75,21 +75,21 @@ func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p Payload) ([]byte,
 	return nil, err
 }
 
-func (b *Statement) Execute(ctx workflow.Context) error {
+func (b *Statement) Execute(ctx workflow.Context, p Payload) error {
 	if b.Parallel != nil {
-		err := b.Parallel.Execute(ctx)
+		err := b.Parallel.Execute(ctx, p)
 		if err != nil {
 			return err
 		}
 	}
 	if b.Sequence != nil {
-		err := b.Sequence.Execute(ctx)
+		err := b.Sequence.Execute(ctx, p)
 		if err != nil {
 			return err
 		}
 	}
 	if b.Step != nil {
-		err := b.Step.Execute(ctx)
+		err := b.Step.Execute(ctx, p)
 		if err != nil {
 			return err
 		}
@@ -97,18 +97,18 @@ func (b *Statement) Execute(ctx workflow.Context) error {
 	return nil
 }
 
-func (a Step) Execute(ctx workflow.Context) error {
+func (a Step) Execute(ctx workflow.Context, p Payload) error {
 	var result string
-	err := workflow.ExecuteActivity(ctx, "main."+a.ScenarioId).Get(ctx, &result)
+	err := workflow.ExecuteActivity(ctx, "main."+a.ScenarioId, p).Get(ctx, &result)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s Sequence) Execute(ctx workflow.Context) error {
+func (s Sequence) Execute(ctx workflow.Context, p Payload) error {
 	for _, a := range s.Elements {
-		err := a.Execute(ctx)
+		err := a.Execute(ctx, p)
 		if err != nil {
 			return err
 		}
@@ -116,12 +116,12 @@ func (s Sequence) Execute(ctx workflow.Context) error {
 	return nil
 }
 
-func (p Parallel) Execute(ctx workflow.Context) error {
+func (p Parallel) Execute(ctx workflow.Context, pl Payload) error {
 	childCtx, cancelHandler := workflow.WithCancel(ctx)
 	selector := workflow.NewSelector(ctx)
 	var activityErr error
 	for _, s := range p.Branches {
-		f := executeAsync(s, childCtx)
+		f := executeAsync(s, childCtx, pl)
 		selector.AddFuture(f, func(f workflow.Future) {
 			err := f.Get(ctx, nil)
 			if err != nil {
@@ -140,11 +140,11 @@ func (p Parallel) Execute(ctx workflow.Context) error {
 	return nil
 }
 
-func executeAsync(exe Executable, ctx workflow.Context) workflow.Future {
+func executeAsync(exe Executable, ctx workflow.Context, p Payload) workflow.Future {
 	future, settable := workflow.NewFuture(ctx)
 
 	workflow.Go(ctx, func(ctx workflow.Context) {
-		err := exe.Execute(ctx)
+		err := exe.Execute(ctx, p)
 		settable.Set(nil, err)
 	})
 	return future
