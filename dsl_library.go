@@ -13,6 +13,7 @@ import (
 const (
 	fieldSeparator = "."
 	asterisk       = "*"
+	startPayload   = "start-payload"
 )
 
 type (
@@ -65,7 +66,9 @@ func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p Payload) ([]byte,
 	ctx = workflow.WithActivityOptions(ctx, ao)
 	logger := workflow.GetLogger(ctx)
 
-	err := dslWorkflow.Root.Execute(ctx, p)
+	binding := make(map[string]any)
+	binding[startPayload] = p
+	err := dslWorkflow.Root.Execute(ctx, binding)
 	if err != nil {
 		logger.Error("DSL Workflow failed.", zap.Error(err))
 		return nil, err
@@ -75,21 +78,21 @@ func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p Payload) ([]byte,
 	return nil, err
 }
 
-func (b *Statement) Execute(ctx workflow.Context, p Payload) error {
+func (b *Statement) Execute(ctx workflow.Context, binding Payload) error {
 	if b.Parallel != nil {
-		err := b.Parallel.Execute(ctx, p)
+		err := b.Parallel.Execute(ctx, binding)
 		if err != nil {
 			return err
 		}
 	}
 	if b.Sequence != nil {
-		err := b.Sequence.Execute(ctx, p)
+		err := b.Sequence.Execute(ctx, binding)
 		if err != nil {
 			return err
 		}
 	}
 	if b.Step != nil {
-		err := b.Step.Execute(ctx, p)
+		err := b.Step.Execute(ctx, binding)
 		if err != nil {
 			return err
 		}
@@ -97,18 +100,21 @@ func (b *Statement) Execute(ctx workflow.Context, p Payload) error {
 	return nil
 }
 
-func (a Step) Execute(ctx workflow.Context, p Payload) error {
+func (a Step) Execute(ctx workflow.Context, binding Payload) error {
 	var result string
-	err := workflow.ExecuteActivity(ctx, "main."+a.ScenarioId, p).Get(ctx, &result)
+
+	err := workflow.ExecuteActivity(ctx, "main."+a.ScenarioId, binding[startPayload]).Get(ctx, &result)
+
+	binding[a.ScenarioId+"-result"] = result
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s Sequence) Execute(ctx workflow.Context, p Payload) error {
+func (s Sequence) Execute(ctx workflow.Context, binding Payload) error {
 	for _, a := range s.Elements {
-		err := a.Execute(ctx, p)
+		err := a.Execute(ctx, binding)
 		if err != nil {
 			return err
 		}
@@ -116,12 +122,12 @@ func (s Sequence) Execute(ctx workflow.Context, p Payload) error {
 	return nil
 }
 
-func (p Parallel) Execute(ctx workflow.Context, pl Payload) error {
+func (p Parallel) Execute(ctx workflow.Context, binding Payload) error {
 	childCtx, cancelHandler := workflow.WithCancel(ctx)
 	selector := workflow.NewSelector(ctx)
 	var activityErr error
 	for _, s := range p.Branches {
-		f := executeAsync(s, childCtx, pl)
+		f := executeAsync(s, childCtx, binding)
 		selector.AddFuture(f, func(f workflow.Future) {
 			err := f.Get(ctx, nil)
 			if err != nil {
@@ -140,11 +146,11 @@ func (p Parallel) Execute(ctx workflow.Context, pl Payload) error {
 	return nil
 }
 
-func executeAsync(exe Executable, ctx workflow.Context, p Payload) workflow.Future {
+func executeAsync(exe Executable, ctx workflow.Context, binding Payload) workflow.Future {
 	future, settable := workflow.NewFuture(ctx)
 
 	workflow.Go(ctx, func(ctx workflow.Context) {
-		err := exe.Execute(ctx, p)
+		err := exe.Execute(ctx, binding)
 		settable.Set(nil, err)
 	})
 	return future
