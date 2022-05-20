@@ -14,6 +14,7 @@ const (
 	fieldSeparator = "."
 	asterisk       = "*"
 	startPayload   = "start-payload"
+	packageName    = "main."
 )
 
 type (
@@ -50,6 +51,8 @@ type (
 		ScenarioId                     string `json:"scenarioId"`
 		Webhook                        string `json:"webhook"`
 		ScenarioCompletionNotification string `json:"scenarioCompletionNotification"`
+		Input                          string `json:"input"`
+		Output                         string `json:"output"`
 	}
 
 	Executable interface {
@@ -101,11 +104,10 @@ func (b *Statement) Execute(ctx workflow.Context, binding Payload) error {
 }
 
 func (a Step) Execute(ctx workflow.Context, binding Payload) error {
-	var result string
-
-	err := workflow.ExecuteActivity(ctx, "main."+a.ScenarioId, binding[startPayload]).Get(ctx, &result)
-
-	binding[a.ScenarioId+"-result"] = result
+	var output Payload
+	input := binding[a.Input]
+	err := workflow.ExecuteActivity(ctx, packageName+a.ScenarioId, input).Get(ctx, &output)
+	binding[a.Output] = output
 	if err != nil {
 		return err
 	}
