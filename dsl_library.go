@@ -2,7 +2,6 @@ package dsl_library
 
 import (
 	"fmt"
-	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/cadence/workflow"
 	"sort"
 	"strings"
@@ -58,7 +57,7 @@ type (
 	}
 )
 
-func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p string) ([]byte, error) {
+func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p Payload) ([]byte, error) {
 	ao := workflow.ActivityOptions{
 		ScheduleToStartTimeout: time.Minute,
 		StartToCloseTimeout:    time.Minute,
@@ -67,16 +66,9 @@ func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p string) ([]byte, 
 	ctx = workflow.WithActivityOptions(ctx, ao)
 	logger := workflow.GetLogger(ctx)
 
-	var payload Payload
-	err := jsoniter.Unmarshal([]byte(p), &payload)
-	if err != nil {
-		logger.Info("Cannot unmarshal payload.")
-		panic(err)
-	}
-
 	binding := make(map[string]any)
-	binding[startPayload] = payload
-	err = dslWorkflow.Root.Execute(ctx, binding)
+	binding[startPayload] = p
+	err := dslWorkflow.Root.Execute(ctx, binding)
 	if err != nil {
 		logger.Error("DSL Workflow failed.", zap.Error(err))
 		return nil, err
