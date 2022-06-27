@@ -21,7 +21,7 @@ type (
 	Payload map[string]any
 
 	Workflow struct {
-		Id          string    `json:"id"`
+		Id          string    `json:"id,omitempty"`
 		Description string    `json:"description,omitempty"`
 		Trigger     []Trigger `json:"trigger,omitempty"`
 		Root        Statement `json:"root"`
@@ -50,6 +50,7 @@ type (
 		StepType                       string `json:"stepType"`
 		ScenarioId                     string `json:"scenarioId"`
 		Webhook                        string `json:"webhook"`
+		Method                         string `json:"method"`
 		ScenarioCompletionNotification string `json:"scenarioCompletionNotification"`
 		Input                          string `json:"input"`
 		Output                         string `json:"output"`
