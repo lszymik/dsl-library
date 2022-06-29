@@ -106,7 +106,7 @@ func (b *Statement) Execute(ctx workflow.Context, binding Payload) error {
 
 func (a Step) Execute(ctx workflow.Context, binding Payload) error {
 	var output Payload
-	input := binding[a.Input]
+	input := binding
 	err := workflow.ExecuteActivity(ctx, packageName+a.ScenarioId, input).Get(ctx, &output)
 	binding[a.Output] = output
 	if err != nil {
