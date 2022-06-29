@@ -70,8 +70,7 @@ func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p Payload) ([]byte,
 	ctx = workflow.WithActivityOptions(ctx, ao)
 	logger := workflow.GetLogger(ctx)
 
-	binding := make(map[string]any)
-	binding[startPayload] = p
+	binding := p
 	err := dslWorkflow.Root.Execute(ctx, binding)
 	if err != nil {
 		logger.Error("DSL Workflow failed.", zap.Error(err))
@@ -106,8 +105,7 @@ func (b *Statement) Execute(ctx workflow.Context, binding Payload) error {
 
 func (a Step) Execute(ctx workflow.Context, binding Payload) error {
 	var output Payload
-	input := binding
-	err := workflow.ExecuteActivity(ctx, packageName+a.ScenarioId, input).Get(ctx, &output)
+	err := workflow.ExecuteActivity(ctx, packageName+a.ScenarioId, binding).Get(ctx, &output)
 	binding[a.Output] = output
 	if err != nil {
 		return err
