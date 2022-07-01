@@ -51,9 +51,10 @@ type (
 		ScenarioId                     string `json:"scenarioId"`
 		Webhook                        string `json:"webhook"`
 		Method                         string `json:"method"`
-		ScenarioCompletionNotification string `json:"scenarioCompletionNotification"`
-		Input                          string `json:"input"`
-		Output                         string `json:"output"`
+		Type                           string `json:"type,omitempty"`
+		ScenarioCompletionNotification string `json:"scenarioCompletionNotification,omitempty"`
+		Input                          string `json:"input,omitempty"`
+		Output                         string `json:"output,omitempty"`
 	}
 
 	Executable interface {
