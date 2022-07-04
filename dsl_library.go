@@ -59,6 +59,15 @@ type (
 	Executable interface {
 		Execute(ctx workflow.Context, p Payload) error
 	}
+
+	MakeRequest struct {
+		Id          string         `json:"id"`
+		Source      string         `json:"source"`
+		SpecVersion string         `json:"specversion"`
+		EventType   string         `json:"type"`
+		ProcessId   string         `json:"processId"`
+		Data        map[string]any `json:"data"`
+	}
 )
 
 func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p Payload) ([]byte, error) {
