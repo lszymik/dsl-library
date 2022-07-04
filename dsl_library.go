@@ -48,7 +48,7 @@ type (
 	Step struct {
 		StepType                       string `json:"stepType"`
 		ScenarioId                     string `json:"scenarioId"`
-		Webhook                        string `json:"webhook"`
+		Url                            string `json:"url"`
 		Method                         string `json:"method"`
 		Type                           string `json:"type,omitempty"`
 		ScenarioCompletionNotification string `json:"scenarioCompletionNotification,omitempty"`
