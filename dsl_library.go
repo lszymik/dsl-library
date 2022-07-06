@@ -38,25 +38,25 @@ type (
 	}
 
 	Sequence struct {
-		Condition Condition    `json:"condition,omitempty"`
+		Condition *Condition   `json:"condition,omitempty"`
 		Elements  []*Statement `json:"elements,omitempty"`
 	}
 
 	Parallel struct {
-		Condition Condition    `json:"condition,omitempty"`
+		Condition *Condition   `json:"condition,omitempty"`
 		Branches  []*Statement `json:"branches,omitempty"`
 	}
 
 	Step struct {
-		StepType                       string    `json:"stepType"`
-		ScenarioId                     string    `json:"scenarioId"`
-		Condition                      Condition `json:"condition,omitempty"`
-		Url                            string    `json:"url"`
-		Method                         string    `json:"method"`
-		Type                           string    `json:"type,omitempty"`
-		ScenarioCompletionNotification string    `json:"scenarioCompletionNotification,omitempty"`
-		Input                          string    `json:"input,omitempty"`
-		Output                         string    `json:"output,omitempty"`
+		StepType                       string     `json:"stepType"`
+		ScenarioId                     string     `json:"scenarioId"`
+		Condition                      *Condition `json:"condition,omitempty"`
+		Url                            string     `json:"url"`
+		Method                         string     `json:"method"`
+		Type                           string     `json:"type,omitempty"`
+		ScenarioCompletionNotification string     `json:"scenarioCompletionNotification,omitempty"`
+		Input                          string     `json:"input,omitempty"`
+		Output                         string     `json:"output,omitempty"`
 	}
 
 	Condition struct {
