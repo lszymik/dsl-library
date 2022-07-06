@@ -38,22 +38,31 @@ type (
 	}
 
 	Sequence struct {
-		Elements []*Statement `json:"elements,omitempty"`
+		Condition Condition    `json:"condition,omitempty"`
+		Elements  []*Statement `json:"elements,omitempty"`
 	}
 
 	Parallel struct {
-		Branches []*Statement `json:"branches,omitempty"`
+		Condition Condition    `json:"condition,omitempty"`
+		Branches  []*Statement `json:"branches,omitempty"`
 	}
 
 	Step struct {
-		StepType                       string `json:"stepType"`
-		ScenarioId                     string `json:"scenarioId"`
-		Url                            string `json:"url"`
-		Method                         string `json:"method"`
-		Type                           string `json:"type,omitempty"`
-		ScenarioCompletionNotification string `json:"scenarioCompletionNotification,omitempty"`
-		Input                          string `json:"input,omitempty"`
-		Output                         string `json:"output,omitempty"`
+		StepType                       string    `json:"stepType"`
+		ScenarioId                     string    `json:"scenarioId"`
+		Condition                      Condition `json:"condition,omitempty"`
+		Url                            string    `json:"url"`
+		Method                         string    `json:"method"`
+		Type                           string    `json:"type,omitempty"`
+		ScenarioCompletionNotification string    `json:"scenarioCompletionNotification,omitempty"`
+		Input                          string    `json:"input,omitempty"`
+		Output                         string    `json:"output,omitempty"`
+	}
+
+	Condition struct {
+		Left  any    `json:"left"`
+		Op    string `json:"op"`
+		Right any    `json:"right"`
 	}
 
 	Executable interface {
