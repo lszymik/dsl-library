@@ -1,15 +1,19 @@
 package dsl_library
 
 import (
+	"fmt"
+	log "github.com/sirupsen/logrus"
 	"go.uber.org/cadence/workflow"
-	"time"
-
 	"go.uber.org/zap"
+	"strings"
+	"time"
 )
 
 const (
-	packageName = "main."
-	resultName  = "-result"
+	activityNamePrefix = "main.f_"
+	resultName         = "-result"
+	referenceSign      = "$"
+	fieldSeparator     = "."
 )
 
 type (
@@ -123,7 +127,7 @@ func (b *Statement) Execute(ctx workflow.Context, binding Payload) error {
 
 func (a Step) Execute(ctx workflow.Context, binding Payload) error {
 	var output Payload
-	err := workflow.ExecuteActivity(ctx, packageName+a.ScenarioId, binding).Get(ctx, &output)
+	err := workflow.ExecuteActivity(ctx, activityNamePrefix+a.ScenarioId, binding).Get(ctx, &output)
 	binding.Data[a.ScenarioId+resultName] = output
 	if err != nil {
 		return err
@@ -173,4 +177,37 @@ func executeAsync(exe Executable, ctx workflow.Context, binding Payload) workflo
 		settable.Set(nil, err)
 	})
 	return future
+}
+
+func getField(field any, binding Payload) (any, error) {
+	switch field.(type) {
+	case string:
+		if strings.HasPrefix(field.(string), referenceSign) {
+			return getFieldValue(field.(string)[1:], binding)
+		} else {
+			return field, nil
+		}
+	default:
+		return field, nil
+	}
+}
+
+func getFieldValue(f string, binding Payload) (any, error) {
+	log.Debugf("Getting value of field %s", f)
+
+	segments := strings.Split(f, fieldSeparator)
+	size := len(segments)
+	if size == 1 {
+		return binding.Result[segments[0]], nil
+	} else {
+		var cur map[string]any
+		var ok bool
+		for i := 0; i < size-1; i++ {
+			cur, ok = binding.Result[segments[i]].(map[string]any)
+			if !ok {
+				return "", fmt.Errorf("cannot read field: %s", segments[i])
+			}
+		}
+		return cur[segments[size-1]], nil
+	}
 }
