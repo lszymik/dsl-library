@@ -14,6 +14,15 @@ const (
 	resultName         = "-result"
 	referenceSign      = "$"
 	fieldSeparator     = "."
+
+	Eq    = "$eq"
+	Neq   = "$neq"
+	Lt    = "$lt"
+	Lte   = "$lte"
+	Gt    = "$gt"
+	Gte   = "$gte"
+	Start = "$start"
+	End   = "$end"
 )
 
 type (
@@ -126,18 +135,10 @@ func (b *Statement) Execute(ctx workflow.Context, binding Payload) error {
 }
 
 func (a Step) Execute(ctx workflow.Context, binding Payload) error {
-	var output Payload
-	err := workflow.ExecuteActivity(ctx, activityNamePrefix+a.ScenarioId, binding).Get(ctx, &output)
-	binding.Data[a.ScenarioId+resultName] = output
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (s Sequence) Execute(ctx workflow.Context, binding Payload) error {
-	for _, a := range s.Elements {
-		err := a.Execute(ctx, binding)
+	if checkCondition(a.Condition, a.ScenarioId, binding) {
+		var output Payload
+		err := workflow.ExecuteActivity(ctx, activityNamePrefix+a.ScenarioId, binding).Get(ctx, &output)
+		binding.Result[a.ScenarioId+resultName] = output
 		if err != nil {
 			return err
 		}
@@ -145,25 +146,52 @@ func (s Sequence) Execute(ctx workflow.Context, binding Payload) error {
 	return nil
 }
 
-func (p Parallel) Execute(ctx workflow.Context, binding Payload) error {
-	childCtx, cancelHandler := workflow.WithCancel(ctx)
-	selector := workflow.NewSelector(ctx)
-	var activityErr error
-	for _, s := range p.Branches {
-		f := executeAsync(s, childCtx, binding)
-		selector.AddFuture(f, func(f workflow.Future) {
-			err := f.Get(ctx, nil)
-			if err != nil {
-				cancelHandler()
-				activityErr = err
-			}
-		})
+func checkCondition(c *Condition, name string, binding Payload) bool {
+	if c != nil {
+		r, err := evaluateCondition(*c, binding)
+		if err != nil {
+			log.Errorf("Cannot process step. %s", err)
+		} else if !r {
+			log.Infof("Skipping step %s due to condition.", name)
+		}
+		return false
 	}
+	return true
+}
 
-	for i := 0; i < len(p.Branches); i++ {
-		selector.Select(ctx)
-		if activityErr != nil {
-			return activityErr
+func (s Sequence) Execute(ctx workflow.Context, binding Payload) error {
+	if checkCondition(s.Condition, "*sequence*", binding) {
+		for _, a := range s.Elements {
+			err := a.Execute(ctx, binding)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (p Parallel) Execute(ctx workflow.Context, binding Payload) error {
+	if checkCondition(p.Condition, "*parallel*", binding) {
+		childCtx, cancelHandler := workflow.WithCancel(ctx)
+		selector := workflow.NewSelector(ctx)
+		var activityErr error
+		for _, s := range p.Branches {
+			f := executeAsync(s, childCtx, binding)
+			selector.AddFuture(f, func(f workflow.Future) {
+				err := f.Get(ctx, nil)
+				if err != nil {
+					cancelHandler()
+					activityErr = err
+				}
+			})
+		}
+
+		for i := 0; i < len(p.Branches); i++ {
+			selector.Select(ctx)
+			if activityErr != nil {
+				return activityErr
+			}
 		}
 	}
 	return nil
@@ -200,14 +228,94 @@ func getFieldValue(f string, binding Payload) (any, error) {
 	if size == 1 {
 		return binding.Result[segments[0]], nil
 	} else {
-		var cur map[string]any
+		cur := binding.Result
 		var ok bool
 		for i := 0; i < size-1; i++ {
-			cur, ok = binding.Result[segments[i]].(map[string]any)
+			cur, ok = cur[segments[i]].(map[string]any)
 			if !ok {
 				return "", fmt.Errorf("cannot read field: %s", segments[i])
 			}
 		}
 		return cur[segments[size-1]], nil
+	}
+}
+
+func evaluateCondition(c Condition, binding Payload) (bool, error) {
+	l, errL := getField(c.Left, binding)
+	r, errR := getField(c.Right, binding)
+
+	if errL != nil || errR != nil {
+		return false, fmt.Errorf("cannot evaluate expression: %s %s", errL, errR)
+	}
+
+	switch c.Op {
+	case Eq:
+		return l == r, nil
+
+	case Neq:
+		return l != r, nil
+
+	case Lt:
+		lv, ok1 := l.(int)
+		rv, ok2 := r.(int)
+
+		if ok1 && ok2 {
+			return lv < rv, nil
+		} else {
+			return false, fmt.Errorf("cannot convert %s", c)
+		}
+
+	case Lte:
+		lv, ok1 := l.(int)
+		rv, ok2 := r.(int)
+
+		if ok1 && ok2 {
+			return lv <= rv, nil
+		} else {
+			return false, fmt.Errorf("cannot convert %s", c)
+		}
+
+	case Gt:
+		lv, ok1 := l.(int)
+		rv, ok2 := r.(int)
+
+		if ok1 && ok2 {
+			return lv > rv, nil
+		} else {
+			return false, fmt.Errorf("cannot convert %s", c)
+		}
+
+	case Gte:
+		lv, ok1 := l.(int)
+		rv, ok2 := r.(int)
+
+		if ok1 && ok2 {
+			return lv >= rv, nil
+		} else {
+			return false, fmt.Errorf("cannot convert %s", c)
+		}
+
+	case Start:
+		lv, ok1 := l.(string)
+		rv, ok2 := r.(string)
+
+		if ok1 && ok2 {
+			return strings.HasPrefix(lv, rv), nil
+		} else {
+			return false, fmt.Errorf("cannot convert %s", c)
+		}
+
+	case End:
+		lv, ok1 := l.(string)
+		rv, ok2 := r.(string)
+
+		if ok1 && ok2 {
+			return strings.HasSuffix(lv, rv), nil
+		} else {
+			return false, fmt.Errorf("cannot convert %s", c)
+		}
+
+	default:
+		return false, fmt.Errorf("unknown operator: %s", c.Op)
 	}
 }
