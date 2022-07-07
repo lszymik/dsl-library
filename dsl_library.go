@@ -153,8 +153,8 @@ func checkCondition(c *Condition, name string, binding Payload) bool {
 			log.Errorf("Cannot process step. %s", err)
 		} else if !r {
 			log.Infof("Skipping step %s due to condition.", name)
+			return false
 		}
-		return false
 	}
 	return true
 }

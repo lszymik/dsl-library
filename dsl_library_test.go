@@ -158,5 +158,29 @@ func Test(t *testing.T) {
 			Expect(err).To(BeNil())
 			Expect(r).To(BeTrue())
 		})
+
+		g.It("should evaluate boolean true", func() {
+			binding := Payload{Result: map[string]any{"11": map[string]any{"isTrue": true}}}
+			r, err := evaluateCondition(Condition{
+				Left:  "$11.isTrue",
+				Op:    Eq,
+				Right: true,
+			}, binding)
+
+			Expect(err).To(BeNil())
+			Expect(r).To(BeTrue())
+		})
+
+		g.It("should evaluate boolean not true", func() {
+			binding := Payload{Result: map[string]any{"11": map[string]any{"isTrue": true}}}
+			r, err := evaluateCondition(Condition{
+				Left:  "$11.isTrue",
+				Op:    Neq,
+				Right: true,
+			}, binding)
+
+			Expect(err).To(BeNil())
+			Expect(r).To(BeFalse())
+		})
 	})
 }
