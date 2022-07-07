@@ -136,9 +136,9 @@ func (b *Statement) Execute(ctx workflow.Context, binding Payload) error {
 
 func (a Step) Execute(ctx workflow.Context, binding Payload) error {
 	if checkCondition(a.Condition, a.ScenarioId, binding) {
-		var output any
+		var output Payload
 		err := workflow.ExecuteActivity(ctx, activityNamePrefix+a.ScenarioId, binding).Get(ctx, &output)
-		binding.Result[a.ScenarioId] = output
+		binding.Result[a.ScenarioId] = output.Result[a.ScenarioId]
 		if err != nil {
 			return err
 		}
