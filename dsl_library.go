@@ -11,7 +11,6 @@ import (
 
 const (
 	activityNamePrefix = "main.f_"
-	resultName         = "-result"
 	referenceSign      = "$"
 	fieldSeparator     = "."
 
@@ -28,8 +27,7 @@ const (
 type (
 	Payload struct {
 		Metadata map[string]any
-		Data     map[string]any
-		Result   map[string]any
+		Ctx      map[string]any
 	}
 
 	Workflow struct {
@@ -61,21 +59,25 @@ type (
 	}
 
 	Step struct {
-		StepType                       string     `json:"stepType"`
-		ScenarioId                     string     `json:"scenarioId"`
-		Condition                      *Condition `json:"condition,omitempty"`
-		Url                            string     `json:"url"`
-		Method                         string     `json:"method"`
-		Type                           string     `json:"type,omitempty"`
-		ScenarioCompletionNotification string     `json:"scenarioCompletionNotification,omitempty"`
-		Input                          string     `json:"input,omitempty"`
-		Output                         string     `json:"output,omitempty"`
+		StepType                       string                  `json:"stepType"`
+		ScenarioId                     string                  `json:"scenarioId"`
+		Condition                      *Condition              `json:"condition,omitempty"`
+		Url                            string                  `json:"url"`
+		Method                         string                  `json:"method"`
+		Type                           string                  `json:"type,omitempty"`
+		ScenarioCompletionNotification *CompletionNotification `json:"scenarioCompletionNotification,omitempty"`
+		Input                          string                  `json:"input,omitempty"`
+		Output                         string                  `json:"output,omitempty"`
 	}
 
 	Condition struct {
 		Left  any    `json:"left"`
 		Op    string `json:"op"`
 		Right any    `json:"right"`
+	}
+
+	CompletionNotification struct {
+		Event []string `json:"event,omitempty"`
 	}
 
 	Executable interface {
@@ -138,7 +140,7 @@ func (a Step) Execute(ctx workflow.Context, binding Payload) error {
 	if checkCondition(a.Condition, a.ScenarioId, binding) {
 		var output Payload
 		err := workflow.ExecuteActivity(ctx, activityNamePrefix+a.ScenarioId, binding).Get(ctx, &output)
-		binding.Result[a.ScenarioId] = output.Result[a.ScenarioId]
+		binding.Ctx[a.ScenarioId] = output.Ctx[a.ScenarioId]
 		if err != nil {
 			return err
 		}
@@ -226,9 +228,9 @@ func getFieldValue(f string, binding Payload) (any, error) {
 	segments := strings.Split(f, fieldSeparator)
 	size := len(segments)
 	if size == 1 {
-		return binding.Result[segments[0]], nil
+		return binding.Ctx[segments[0]], nil
 	} else {
-		cur := binding.Result
+		cur := binding.Ctx
 		var ok bool
 		for i := 0; i < size-1; i++ {
 			cur, ok = cur[segments[i]].(map[string]any)
