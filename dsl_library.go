@@ -1,10 +1,12 @@
 package dsl_library
 
 import (
+	"encoding/json"
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/cadence/workflow"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 	"strings"
 	"time"
 )
@@ -13,6 +15,7 @@ const (
 	activityNamePrefix = "main.f_"
 	referenceSign      = "$"
 	fieldSeparator     = "."
+	workflowId         = "workflowId"
 
 	Eq    = "$eq"
 	Neq   = "$neq"
@@ -92,6 +95,11 @@ type (
 		ProcessId   string         `json:"processId"`
 		Data        map[string]any `json:"data"`
 	}
+
+	Event struct {
+		EventType string         `json:"eventType"`
+		Body      map[string]any `json:"body"`
+	}
 )
 
 func DSLWorkflow(ctx workflow.Context, dslWorkflow Workflow, p Payload) ([]byte, error) {
@@ -136,16 +144,43 @@ func (b *Statement) Execute(ctx workflow.Context, binding Payload) error {
 	return nil
 }
 
-func (a Step) Execute(ctx workflow.Context, binding Payload) error {
-	if checkCondition(a.Condition, a.ScenarioId, binding) {
-		var output Payload
-		err := workflow.ExecuteActivity(ctx, activityNamePrefix+a.ScenarioId, binding).Get(ctx, &output)
-		binding.Ctx[a.ScenarioId] = output.Ctx[a.ScenarioId]
-		if err != nil {
-			return err
+func (step Step) Execute(ctx workflow.Context, binding Payload) error {
+	if checkCondition(step.Condition, step.ScenarioId, binding) {
+		r := executeStep(ctx, binding, step)
+		if step.ScenarioCompletionNotification != nil && len(step.ScenarioCompletionNotification.Event) > 0 {
+			waitForEvent(ctx, binding, step)
 		}
+		return r
 	}
 	return nil
+}
+
+func executeStep(ctx workflow.Context, binding Payload, step Step) error {
+	var output Payload
+	err := workflow.ExecuteActivity(ctx, activityNamePrefix+step.ScenarioId, binding).Get(ctx, &output)
+	binding.Ctx[step.ScenarioId] = output.Ctx[step.ScenarioId]
+	return err
+}
+
+func waitForEvent(ctx workflow.Context, binding Payload, step Step) {
+	s := workflow.NewSelector(ctx)
+	var r bool
+
+	for !r {
+		s.AddReceive(workflow.GetSignalChannel(ctx, binding.Metadata[workflowId].(string)), func(c workflow.Channel, ok bool) {
+			var m string
+			c.Receive(ctx, &m)
+
+			event, err := unmarshalEvent(m)
+			if err != nil {
+				if slices.Contains(step.ScenarioCompletionNotification.Event, event.EventType) {
+					binding.Ctx[event.EventType] = event.Body
+					r = true
+				}
+			}
+		})
+		s.Select(ctx)
+	}
 }
 
 func checkCondition(c *Condition, name string, binding Payload) bool {
@@ -320,4 +355,15 @@ func evaluateCondition(c Condition, binding Payload) (bool, error) {
 	default:
 		return false, fmt.Errorf("unknown operator: %s", c.Op)
 	}
+}
+
+func unmarshalEvent(s string) (Event, error) {
+	var event Event
+
+	err := json.Unmarshal([]byte(s), &event)
+	if err != nil {
+		log.Errorf("Cannot unmarshal event from signal. %s", err)
+		return Event{}, err
+	}
+	return event, nil
 }
