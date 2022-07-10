@@ -168,11 +168,10 @@ func waitForEvent(ctx workflow.Context, binding Payload, step Step) {
 
 	for !r {
 		s.AddReceive(workflow.GetSignalChannel(ctx, binding.Metadata[workflowId].(string)), func(c workflow.Channel, ok bool) {
-			var m string
-			c.Receive(ctx, &m)
+			var event Event
+			ok1 := c.Receive(ctx, &event)
 
-			event, err := unmarshalEvent(m)
-			if err != nil {
+			if ok1 {
 				if slices.Contains(step.ScenarioCompletionNotification.Event, event.EventType) {
 					binding.Ctx[event.EventType] = event.Body
 					r = true
