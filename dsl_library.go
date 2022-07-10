@@ -148,6 +148,7 @@ func (step Step) Execute(ctx workflow.Context, binding Payload) error {
 	if checkCondition(step.Condition, step.ScenarioId, binding) {
 		r := executeStep(ctx, binding, step)
 		if step.ScenarioCompletionNotification != nil && len(step.ScenarioCompletionNotification.Event) > 0 {
+			log.Infof("Waiting for event notification with event types: %s", step.ScenarioCompletionNotification.Event)
 			waitForEvent(ctx, binding, step)
 		}
 		return r
@@ -165,11 +166,13 @@ func executeStep(ctx workflow.Context, binding Payload, step Step) error {
 func waitForEvent(ctx workflow.Context, binding Payload, step Step) {
 	s := workflow.NewSelector(ctx)
 	var r bool
+	var eT string
 
 	for !r {
 		s.AddReceive(workflow.GetSignalChannel(ctx, binding.Metadata[workflowId].(string)), func(c workflow.Channel, ok bool) {
 			var event Event
 			ok1 := c.Receive(ctx, &event)
+			eT = event.EventType
 
 			if ok1 {
 				if slices.Contains(step.ScenarioCompletionNotification.Event, event.EventType) {
@@ -180,6 +183,7 @@ func waitForEvent(ctx workflow.Context, binding Payload, step Step) {
 		})
 		s.Select(ctx)
 	}
+	log.Infof("Finishing waiting as event with type %s received.", eT)
 }
 
 func checkCondition(c *Condition, name string, binding Payload) bool {
